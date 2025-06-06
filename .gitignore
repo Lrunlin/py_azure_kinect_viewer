@@ -1,0 +1,10 @@
+node_modules
+dist
+.idea
+__pycache__
+.vscode
+.DS_Store
+*.local
+./data
+
+admin/dist
