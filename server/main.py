@@ -13,7 +13,7 @@ import datetime
 
 DEBUG_MODE = True  # 是否打印文件操作和Http请求日志
 local_ip = "127.0.0.1"
-OUTPUT_DIR = "../data"  # 数据存储地址
+OUTPUT_DIR = "./data"  # 数据存储地址
 
 
 def debug_log(msg):
@@ -75,28 +75,17 @@ def generate_point_cloud(depth_image, fx, fy, cx, cy, color_image=None):
     return points, colors
 
 
-def save_depth_images(base_dir, timestamp, depth_image):
+def save_depth_images(base_dir, timestamp, depth_image, color_image):
     t_start = time.time()
-    # 1️⃣ 保存16位PNG
-    depth_16bit_path = os.path.join(base_dir, f"{timestamp}_depth16.png")
-    cv2.imwrite(depth_16bit_path, depth_image)
-    debug_log(f"保存深度图16位完成: {depth_16bit_path}")
-
-    # 2️⃣ 保存8位PNG（缩放到0~255）
-    depth_8bit = cv2.convertScaleAbs(depth_image, alpha=255.0 / 5000.0)
-    depth_8bit_path = os.path.join(base_dir, f"{timestamp}_depth8.png")
-    cv2.imwrite(depth_8bit_path, depth_8bit)
-    debug_log(f"保存深度图8位完成: {depth_8bit_path}")
-
-    # 3️⃣ 保存npy文件
+    # 保存npy文件
     depth_npy_path = os.path.join(base_dir, f"{timestamp}_depth.npy")
-    np.save(depth_npy_path, depth_image)
+    np.save(depth_npy_path, {"depth": depth_image, "color": color_image})
     debug_log(f"保存深度图npy完成: {depth_npy_path}")
 
     t_end = time.time()
     debug_log(f"深度图保存全部完成, 总用时 {t_end - t_start:.3f} 秒")
 
-    return depth_16bit_path, depth_8bit_path, depth_npy_path
+    return depth_npy_path
 
 
 def save_point_cloud_ply(filename, points, colors):
@@ -156,6 +145,7 @@ def save_point_cloud_json(points, colors):
             "b": int(b)
         })
     return data
+
 
 latest_frame = None
 frame_lock = threading.Lock()
@@ -221,7 +211,8 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
         def background_save():
             try:
                 depth_image = frame.depth
-                save_depth_images(base_dir, timestamp, depth_image)
+                save_depth_images(base_dir, timestamp,
+                                  depth_image, color_image)
                 fx, fy = 600.0, 600.0
                 cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
                 points, colors = generate_point_cloud(
@@ -241,7 +232,7 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
         })
 
     depth_image = frame.depth
-    save_depth_images(base_dir, timestamp, depth_image)
+    save_depth_images(base_dir, timestamp, depth_image, color_image)
     fx, fy = 600.0, 600.0
     cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
     points, colors = generate_point_cloud(
@@ -256,9 +247,10 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
         "status": "success",
         "timestamp": timestamp,
         "rgb_image": to_url_path(rgb_path),
-        "json_data": save_point_cloud_json( points, colors)
+        "json_data": save_point_cloud_json(points, colors)
     })
-    
+
+
 @app.get("/stats")
 def get_today_stats():
     # 获取今天的日期（格式：yyyy-mm-dd）
@@ -278,8 +270,7 @@ def get_today_stats():
         "date": today_str,
         "folder_count": folder_count
     })
-        
-    
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=3000)

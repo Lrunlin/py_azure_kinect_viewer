@@ -2,13 +2,14 @@ import os
 import json
 import numpy as np
 import time
-import cv2
 import concurrent.futures
 import traceback
+
 
 def debug_log(msg):
     timestamp = time.strftime('%H:%M:%S')
     print(f"[{timestamp}] {msg}")
+
 
 def convert_npy_file(npy_path, fx=600.0, fy=600.0):
     try:
@@ -18,10 +19,14 @@ def convert_npy_file(npy_path, fx=600.0, fy=600.0):
 
         merged_data = []
         t_start = time.time()
-        depth = np.load(npy_path)
-        base_name = os.path.splitext(os.path.basename(npy_path))[0]
-        possible_rgb = os.path.join(folder_path, f"{base_name}.png")
-        has_color = os.path.exists(possible_rgb)
+
+        # 直接读取npy文件（包含depth和color）
+        npy_data = np.load(npy_path, allow_pickle=True).item()
+        depth = npy_data.get("depth")
+        color_image = npy_data.get("color")
+
+        if depth is None:
+            raise ValueError("NPY文件中缺少depth数据")
 
         height, width = depth.shape
         cx, cy = width / 2.0, height / 2.0
@@ -32,8 +37,8 @@ def convert_npy_file(npy_path, fx=600.0, fy=600.0):
         y = (yy[valid] - cy) * z / fy
         points = np.vstack((x, y, z)).T
 
-        if has_color:
-            color_image = cv2.imread(possible_rgb)
+        if color_image is not None:
+            # color_image的shape: (H, W, 3)
             colors = color_image[yy[valid], xx[valid], :]
         else:
             colors = np.zeros((points.shape[0], 3), dtype=np.uint8)
@@ -49,13 +54,17 @@ def convert_npy_file(npy_path, fx=600.0, fy=600.0):
                 "g": int(g),
                 "b": int(b)
             })
+
         t_end = time.time()
-        debug_log(f"[NPY → JSON] {os.path.basename(npy_path)} 转换完成，用时 {t_end - t_start:.3f} 秒")
+        debug_log(
+            f"[NPY → JSON] {os.path.basename(npy_path)} 转换完成，用时 {t_end - t_start:.3f} 秒")
         return output_json, merged_data, True
+
     except Exception as e:
         debug_log(f"[错误] 处理文件 {npy_path} 出错: {e}")
         traceback.print_exc()
         return None, None, False
+
 
 def convert_npy_to_json(folder_path):
     folder_name = os.path.basename(os.path.normpath(folder_path))
@@ -92,6 +101,7 @@ def convert_npy_to_json(folder_path):
 
     return success_count, failure_count
 
+
 def process_all_subfolders(root_folder):
     total_success = 0
     total_failure = 0
@@ -110,6 +120,7 @@ def process_all_subfolders(root_folder):
     debug_log(f"总失败文件数: {total_failure}")
     debug_log(f"总耗时: {overall_end - overall_start:.2f} 秒")
 
+
 if __name__ == "__main__":
-    root_dir = "../data"
+    root_dir = "./data"
     process_all_subfolders(root_dir)
