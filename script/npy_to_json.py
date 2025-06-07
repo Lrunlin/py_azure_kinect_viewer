@@ -20,10 +20,17 @@ def convert_npy_file(npy_path, fx=600.0, fy=600.0):
         merged_data = []
         t_start = time.time()
 
-        # 直接读取npy文件（包含depth和color）
-        npy_data = np.load(npy_path, allow_pickle=True).item()
-        depth = npy_data.get("depth")
-        color_image = npy_data.get("color")
+        # 尝试解析npz文件或npy字典格式
+        npy_data = np.load(npy_path, allow_pickle=True)
+        if isinstance(npy_data, np.lib.npyio.NpzFile):
+            npy_data = dict(npy_data)
+        if isinstance(npy_data, dict) or isinstance(npy_data, np.ndarray) and npy_data.shape == ():  # 0维数组
+            npy_data = npy_data.item()
+            depth = npy_data.get("depth")
+            color_image = npy_data.get("color")
+        else:
+            depth = npy_data
+            color_image = None
 
         if depth is None:
             raise ValueError("NPY文件中缺少depth数据")
@@ -38,7 +45,6 @@ def convert_npy_file(npy_path, fx=600.0, fy=600.0):
         points = np.vstack((x, y, z)).T
 
         if color_image is not None:
-            # color_image的shape: (H, W, 3)
             colors = color_image[yy[valid], xx[valid], :]
         else:
             colors = np.zeros((points.shape[0], 3), dtype=np.uint8)
@@ -122,5 +128,5 @@ def process_all_subfolders(root_folder):
 
 
 if __name__ == "__main__":
-    root_dir = "./data"
+    root_dir = "./data/2025-06-07"
     process_all_subfolders(root_dir)

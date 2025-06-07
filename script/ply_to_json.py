@@ -94,5 +94,5 @@ def process_all_subfolders(root_folder):
     debug_log(f"总耗时: {overall_end - overall_start:.2f} 秒")
 
 if __name__ == "__main__":
-    root_dir = "../data"
+    root_dir = "./data"
     process_all_subfolders(root_dir)
