@@ -3,7 +3,6 @@ import time
 import threading
 import numpy as np
 import cv2
-import requests
 from pyk4a import PyK4A, Config, ColorResolution, DepthMode
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -11,20 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import datetime
-import json
-import socket
 
-DEBUG_MODE = True #是否打印文件操作和Http请求日志
+DEBUG_MODE = True  # 是否打印文件操作和Http请求日志
 local_ip = "127.0.0.1"
-OUTPUT_DIR = "../data"#数据存储地址
+OUTPUT_DIR = "../data"  # 数据存储地址
+
 
 def debug_log(msg):
     if DEBUG_MODE:
         timestamp = time.strftime('%H:%M:%S')
         print(f"[{timestamp}] {msg}")
-
-
-
 
 
 '''
@@ -53,7 +48,6 @@ DepthMode.PASSIVE_IR        # 仅红外模式
 '''
 
 
-
 k4a = PyK4A(Config(
     color_resolution=ColorResolution.RES_2160P,
     depth_mode=DepthMode.NFOV_UNBINNED,
@@ -61,6 +55,7 @@ k4a = PyK4A(Config(
 ))
 k4a.start()
 debug_log("Azure Kinect已启动")
+
 
 def generate_point_cloud(depth_image, fx, fy, cx, cy, color_image=None):
     t_start = time.time()
@@ -78,6 +73,7 @@ def generate_point_cloud(depth_image, fx, fy, cx, cy, color_image=None):
     t_end = time.time()
     debug_log(f"生成点云完成，用时 {t_end - t_start:.3f} 秒")
     return points, colors
+
 
 def save_depth_images(base_dir, timestamp, depth_image):
     t_start = time.time()
@@ -102,6 +98,7 @@ def save_depth_images(base_dir, timestamp, depth_image):
 
     return depth_16bit_path, depth_8bit_path, depth_npy_path
 
+
 def save_point_cloud_ply(filename, points, colors):
     t_start = time.time()
     with open(filename, 'w') as f:
@@ -121,6 +118,7 @@ def save_point_cloud_ply(filename, points, colors):
             f.write(f"{x} {y} {z} {r} {g} {b}\n")
     t_end = time.time()
     debug_log(f"保存PLY完成，用时 {t_end - t_start:.3f} 秒")
+
 
 def save_point_cloud_pcd(filename, points, colors):
     t_start = time.time()
@@ -143,8 +141,8 @@ def save_point_cloud_pcd(filename, points, colors):
     t_end = time.time()
     debug_log(f"保存PCD完成，用时 {t_end - t_start:.3f} 秒")
 
-def save_point_cloud_json(filename, points, colors):
-    t_start = time.time()
+
+def save_point_cloud_json(points, colors):
     data = []
     for i in range(points.shape[0]):
         x, y, z = points[i]
@@ -157,13 +155,11 @@ def save_point_cloud_json(filename, points, colors):
             "g": int(g),
             "b": int(b)
         })
-    with open(filename, 'w') as f:
-        json.dump(data, f, indent=2)
-    t_end = time.time()
-    debug_log(f"保存JSON完成，用时 {t_end - t_start:.3f} 秒")
+    return data
 
 latest_frame = None
 frame_lock = threading.Lock()
+
 
 def background_capture():
     global latest_frame
@@ -176,6 +172,7 @@ def background_capture():
         except Exception as e:
             debug_log(f"后台采集失败: {e}")
         time.sleep(0.01)
+
 
 threading.Thread(target=background_capture, daemon=True).start()
 debug_log("后台线程已启动")
@@ -196,7 +193,6 @@ app.add_middleware(
 def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0=极速模式")):
     with frame_lock:
         frame = latest_frame
-
     if frame is None:
         return JSONResponse(content={"status": "fail", "message": "暂无可用帧"}, status_code=500)
 
@@ -214,6 +210,7 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
     debug_log(f"保存RGB完成，用时 {time.time() - t_start:.3f} 秒")
 
     host_url = f"http://{local_ip}:3000"
+
     def to_url_path(path):
         rel_path = path.replace(OUTPUT_DIR, "/data")
         rel_path = rel_path.replace("\\", "/")
@@ -227,14 +224,16 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
                 save_depth_images(base_dir, timestamp, depth_image)
                 fx, fy = 600.0, 600.0
                 cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
-                points, colors = generate_point_cloud(depth_image, fx, fy, cx, cy, color_image)
-                save_point_cloud_ply(os.path.join(base_dir, f"{timestamp}.ply"), points, colors)
-                save_point_cloud_pcd(os.path.join(base_dir, f"{timestamp}.pcd"), points, colors)
-                save_point_cloud_json(os.path.join(base_dir, f"{timestamp}.json"), points, colors)
+                points, colors = generate_point_cloud(
+                    depth_image, fx, fy, cx, cy, color_image)
+                save_point_cloud_ply(os.path.join(
+                    base_dir, f"{timestamp}.ply"), points, colors)
+                save_point_cloud_pcd(os.path.join(
+                    base_dir, f"{timestamp}.pcd"), points, colors)
                 debug_log("极速模式：后台保存完毕")
             except Exception as e:
                 debug_log(f"极速模式后台保存失败: {e}")
-        threading.Thread(target=background_save, daemon=True).start()# 多线程保存
+        threading.Thread(target=background_save, daemon=True).start()  # 多线程保存
         return JSONResponse(content={
             "status": "success",
             "timestamp": timestamp,
@@ -245,28 +244,42 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
     save_depth_images(base_dir, timestamp, depth_image)
     fx, fy = 600.0, 600.0
     cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
-    points, colors = generate_point_cloud(depth_image, fx, fy, cx, cy, color_image)
-    save_point_cloud_ply(os.path.join(base_dir, f"{timestamp}.ply"), points, colors)
-    save_point_cloud_pcd(os.path.join(base_dir, f"{timestamp}.pcd"), points, colors)
-    json_path = os.path.join(base_dir, f"{timestamp}.json")
-    save_point_cloud_json(json_path, points, colors)
-
-    with open(json_path, "r", encoding="utf-8") as jf:
-        point_cloud_data = json.load(jf)
+    points, colors = generate_point_cloud(
+        depth_image, fx, fy, cx, cy, color_image)
+    save_point_cloud_ply(os.path.join(
+        base_dir, f"{timestamp}.ply"), points, colors)
+    save_point_cloud_pcd(os.path.join(
+        base_dir, f"{timestamp}.pcd"), points, colors)
 
     debug_log("预览模式：所有数据保存完成")
     return JSONResponse(content={
         "status": "success",
         "timestamp": timestamp,
         "rgb_image": to_url_path(rgb_path),
-        "json_file": to_url_path(json_path),
-        "json_data": point_cloud_data
+        "json_data": save_point_cloud_json( points, colors)
     })
+    
+@app.get("/stats")
+def get_today_stats():
+    # 获取今天的日期（格式：yyyy-mm-dd）
+    today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    today_dir = os.path.join(OUTPUT_DIR, today_str)
 
-@app.on_event("shutdown")
-def shutdown_event():
-    k4a.stop()
-    debug_log("设备已关闭")
+    # 检查目录是否存在
+    if not os.path.exists(today_dir):
+        folder_count = 0
+    else:
+        # 统计子文件夹数量
+        folder_count = sum(os.path.isdir(os.path.join(today_dir, name))
+                           for name in os.listdir(today_dir))
+
+    return JSONResponse(content={
+        "status": "success",
+        "date": today_str,
+        "folder_count": folder_count
+    })
+        
+    
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=3000)

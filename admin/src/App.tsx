@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Button, Divider, Input, Image, Checkbox } from "antd";
+import { Button, Divider, Input, Image, Checkbox, Alert } from "antd";
 import useFetch from "./hooks/useFetch.jsx";
 import PointCloudViewer from "./PointCloudViewer.tsx";
 
@@ -14,10 +14,17 @@ export interface RootObject {
   json_file: string;
 }
 
+export interface CountRootObject {
+  status: string;
+  date: string;
+  folder_count: number;
+}
+
 function App() {
   const [address, setAddress] = useState(localStorage.address || "http://127.0.0.1"); //接收缓存地址
   const [preview, setPreview] = useState(+(localStorage.preview == "1")); //接收缓存预览模式
 
+  // 请求
   let { data, isLoading, error, refetch } = useFetch<RootObject, {}>(
     () =>
       axios
@@ -25,8 +32,23 @@ function App() {
         .then(res => res.data),
     {
       manual: true,
+      callback: () => {
+        setData(val => {
+          if (val) {
+            return { ...val, folder_count: val?.folder_count + 1 || 0 } as CountRootObject;
+          } else {
+            return val;
+          }
+        });
+      },
     }
   );
+  // 今日个数
+  let {
+    data: count,
+    isLoading: countISLoading,
+    setData,
+  } = useFetch<CountRootObject, {}>(() => axios.get(`${address}:3000/stats`).then(res => res.data));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,6 +64,16 @@ function App() {
 
   return (
     <>
+      <Alert
+        className="!mx-4 !mt-4"
+        message={
+          <div className="flex">
+            今日采集个数: <div className="font-bold mx-1">{count?.folder_count || 0}</div> 个
+          </div>
+        }
+        type="info"
+        showIcon
+      />
       {/* 地址部分 */}
       <div className="mt-4 ml-4">
         <Input

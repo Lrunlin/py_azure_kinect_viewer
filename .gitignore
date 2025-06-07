@@ -5,6 +5,6 @@ __pycache__
 .vscode
 .DS_Store
 *.local
-./data
+data/**/*.*
 
 admin/dist
