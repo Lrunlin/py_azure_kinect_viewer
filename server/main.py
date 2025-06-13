@@ -3,7 +3,6 @@ import time
 import threading
 import numpy as np
 import cv2
-from pyk4a import PyK4A, Config, ColorResolution, DepthMode
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,140 +10,19 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import datetime
 
-DEBUG_MODE = True  # 是否打印文件操作和Http请求日志
-local_ip = "127.0.0.1"
-OUTPUT_DIR = "./data"  # 数据存储地址
+from modules.K4A import K4A
+from modules.save.ply import save_point_cloud_ply
+from modules.save.pcd import save_point_cloud_pcd
+from modules.save.npy import save_depth_images
+from modules.save.json import save_point_cloud_json
+from modules.generate_point_cloud import generate_point_cloud
+from modules.log import log as debug_log
+from config import OUTPUT_DIR, LOCAL_IP
 
 
-def debug_log(msg):
-    if DEBUG_MODE:
-        timestamp = time.strftime('%H:%M:%S')
-        print(f"[{timestamp}] {msg}")
-
-
-'''
-【彩色相机分辨率（ColorResolution）】
-16:9 比例：
-ColorResolution.RES_720P    # 720p（1280x720）
-ColorResolution.RES_1080P   # 1080p（1920x1080）
-ColorResolution.RES_1440P   # 1440p（2560x1440）
-ColorResolution.RES_2160P   # 2160p（3840x2160）
-
-4:3 比例：
-ColorResolution.RES_1536P   # 1536p（2048x1536）
-ColorResolution.RES_3072P   # 3072p（4096x3072）
-
-关闭彩色相机：
-ColorResolution.OFF
-
-【深度相机分辨率/模式（DepthMode）】
-DepthMode.NFOV_BINNED       # 窄视角，降采样
-DepthMode.NFOV_UNBINNED     # 窄视角，非降采样
-DepthMode.WFOV_BINNED       # 广视角，降采样
-DepthMode.WFOV_UNBINNED     # 广视角，非降采样
-DepthMode.PASSIVE_IR        # 仅红外模式
-
- camera_fps=pyk4a.FrameRate.FPS_5 帧率
-'''
-
-
-k4a = PyK4A(Config(
-    color_resolution=ColorResolution.RES_2160P,
-    depth_mode=DepthMode.NFOV_UNBINNED,
-    synchronized_images_only=True
-))
+k4a = K4A()
 k4a.start()
 debug_log("Azure Kinect已启动")
-
-
-def generate_point_cloud(depth_image, fx, fy, cx, cy, color_image=None):
-    t_start = time.time()
-    height, width = depth_image.shape
-    xx, yy = np.meshgrid(np.arange(width), np.arange(height))
-    valid = (depth_image > 0)
-    z = depth_image[valid] / 1000.0
-    x = (xx[valid] - cx) * z / fx
-    y = (yy[valid] - cy) * z / fy
-    points = np.vstack((x, y, z)).T
-    if color_image is not None:
-        colors = color_image[yy[valid], xx[valid], :]
-    else:
-        colors = np.zeros((points.shape[0], 3), dtype=np.uint8)
-    t_end = time.time()
-    debug_log(f"生成点云完成，用时 {t_end - t_start:.3f} 秒")
-    return points, colors
-
-
-def save_depth_images(base_dir, timestamp, depth_image, color_image):
-    t_start = time.time()
-    # 保存npy文件
-    depth_npy_path = os.path.join(base_dir, f"{timestamp}_depth.npy")
-    np.save(depth_npy_path, {"depth": depth_image, "color": color_image})
-    debug_log(f"保存深度图npy完成: {depth_npy_path}")
-
-    t_end = time.time()
-    debug_log(f"深度图保存全部完成, 总用时 {t_end - t_start:.3f} 秒")
-
-    return depth_npy_path
-
-
-def save_point_cloud_ply(filename, points, colors):
-    t_start = time.time()
-    with open(filename, 'w') as f:
-        f.write("ply\n")
-        f.write("format ascii 1.0\n")
-        f.write(f"element vertex {points.shape[0]}\n")
-        f.write("property float x\n")
-        f.write("property float y\n")
-        f.write("property float z\n")
-        f.write("property uchar red\n")
-        f.write("property uchar green\n")
-        f.write("property uchar blue\n")
-        f.write("end_header\n")
-        for i in range(points.shape[0]):
-            x, y, z = points[i]
-            r, g, b = colors[i]
-            f.write(f"{x} {y} {z} {r} {g} {b}\n")
-    t_end = time.time()
-    debug_log(f"保存PLY完成，用时 {t_end - t_start:.3f} 秒")
-
-
-def save_point_cloud_pcd(filename, points, colors):
-    t_start = time.time()
-    with open(filename, 'w') as f:
-        f.write("VERSION .7\n")
-        f.write("FIELDS x y z rgb\n")
-        f.write("SIZE 4 4 4 4\n")
-        f.write("TYPE F F F U\n")
-        f.write("COUNT 1 1 1 1\n")
-        f.write(f"WIDTH {points.shape[0]}\n")
-        f.write("HEIGHT 1\n")
-        f.write("VIEWPOINT 0 0 0 1 0 0 0\n")
-        f.write(f"POINTS {points.shape[0]}\n")
-        f.write("DATA ascii\n")
-        for i in range(points.shape[0]):
-            x, y, z = points[i]
-            r, g, b = colors[i]
-            rgb = (int(r) << 16) | (int(g) << 8) | int(b)
-            f.write(f"{x} {y} {z} {rgb}\n")
-    t_end = time.time()
-    debug_log(f"保存PCD完成，用时 {t_end - t_start:.3f} 秒")
-
-
-def save_point_cloud_json(points, colors):
-    data = []
-    for i in range(points.shape[0]):
-        x, y, z = points[i]
-        r, g, b = colors[i]
-        data.append({
-            "x": float(x),
-            "y": float(y),
-            "z": float(z),
-            "r": int(r),
-            "g": int(g),
-            "b": int(b)
-        })
-    return data
 
 
 latest_frame = None
@@ -199,13 +77,12 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
     cv2.imwrite(rgb_path, color_image)
     debug_log(f"保存RGB完成，用时 {time.time() - t_start:.3f} 秒")
 
-    host_url = f"http://{local_ip}:3000"
+    host_url = f"http://{LOCAL_IP}:3000"
 
     def to_url_path(path):
         rel_path = path.replace(OUTPUT_DIR, "/data")
         rel_path = rel_path.replace("\\", "/")
         return f"{host_url}{rel_path}"
-    #
 
     if preview_mode == 0:
         def background_save():

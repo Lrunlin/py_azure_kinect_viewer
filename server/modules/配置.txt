@@ -1,0 +1,55 @@
+解释：
+在 Azure Kinect 中，深度模式（Depth Mode） 决定了深度相机的视场（Field of View，简称 FOV）、分辨率和采样方式。不同的深度模式决定了相机如何捕获深度图像，并影响图像的精度、覆盖区域以及性能。
+
+视场（Field of View）：
+
+窄视角（NFOV, Narrow Field of View）：适用于近距离的目标，能够提供较高的深度精度，但覆盖区域较小。
+
+广视角（WFOV, Wide Field of View）：适用于较远或较大范围的目标，覆盖的区域更大，但精度可能较低。
+
+采样方式：
+
+降采样（BINNED）：通过减少采样点来提高处理速度，但会降低精度，适合实时应用或性能受限的场景。
+
+非降采样（UNBINNED）：采样点更多，提供更高的精度，但处理速度较慢。
+
+配置说明：
+DepthMode.NFOV_BINNED：窄视角 + 降采样。适合近距离场景，能提供较高的精度，但覆盖范围小。
+
+DepthMode.NFOV_UNBINNED：窄视角 + 非降采样。适合近距离，要求较高精度的应用。
+
+DepthMode.WFOV_BINNED：广视角 + 降采样。适用于远距离或更大范围的目标，牺牲一些精度来获得更大的覆盖区域。
+
+DepthMode.WFOV_UNBINNED：广视角 + 非降采样。适用于较大范围的目标，精度较高，但处理速度较慢。
+
+对于目标尺寸（36cm x 26cm）的选择：
+假设你扫描的目标尺寸为 36cm x 26cm，它属于一个相对较小的区域。为了实现对该区域的精确扫描，建议选择窄视角（NFOV）配置，并且使用 非降采样（UNBINNED） 模式，以保证较高的精度。
+
+推荐配置：
+
+
+k4a = PyK4A(Config(
+    color_resolution=ColorResolution.RES_1080P,  # 可选择 720P 或 1080P，根据需要决定分辨率
+    depth_mode=DepthMode.NFOV_UNBINNED,  # 窄视角，非降采样
+    camera_fps=30,  # 设置合适的帧率
+    synchronized_images_only=True
+))
+解释：
+窄视角（NFOV）：在目标尺寸较小的情况下，窄视角能够提供更高的深度精度，适合精细扫描。
+
+非降采样（UNBINNED）：不降低分辨率，能获得较高的深度精度，特别适用于小尺寸的目标。
+
+为什么选择这种配置：
+较高的精度：对于 36cm x 26cm 的目标，精度是非常重要的，非降采样模式能够提供更高的深度分辨率。
+
+适合小范围扫描：窄视角适用于近距离的扫描，并能够提供精细的深度信息。
+
+总结：
+对于 36cm x 26cm 的目标，DepthMode.NFOV_UNBINNED 是最合适的配置，能够确保较高的深度精度和清晰的图像质量。
+
+
+
+
+
+
+
