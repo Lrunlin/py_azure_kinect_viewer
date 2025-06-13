@@ -23,6 +23,7 @@ export interface CountRootObject {
 function App() {
   const [address, setAddress] = useState(localStorage.address || "http://127.0.0.1"); //接收缓存地址
   const [preview, setPreview] = useState(+(localStorage.preview == "1")); //接收缓存预览模式
+  const [isPreview, setIsPreview] = useState(+(localStorage.is_preview == "1")); //接收缓存预览模式
 
   // 请求
   let { data, isLoading, error, refetch } = useFetch<RootObject, {}>(
@@ -89,35 +90,57 @@ function App() {
       <Divider />
       {/* 点击请求 */}
       <div className="mt-4 ml-4">
-        <Checkbox
-          checked={!!preview}
-          onChange={e => {
-            let result = +e.target.checked;
-            setPreview(result);
-            localStorage.preview = result.toString();
-          }}
-        >
-          预览模式
-        </Checkbox>
-        <br />
-        <Button className="mt-4" loading={isLoading} type="primary" onClick={() => refetch()}>
-          点云保存
-        </Button>
+        <div>
+          <Checkbox
+            checked={!!preview}
+            onChange={e => {
+              let result = +e.target.checked;
+              setPreview(result);
+              localStorage.preview = result.toString();
+            }}
+          >
+            预览点云
+          </Checkbox>
+          <Checkbox
+            checked={!!isPreview}
+            onChange={e => {
+              let result = +e.target.checked;
+              setIsPreview(result);
+              localStorage.is_preview = result.toString();
+            }}
+          >
+            实时画面
+          </Checkbox>
+        </div>
+        <div>
+          <Button className="mt-4" loading={isLoading} type="primary" onClick={() => refetch()}>
+            点云保存
+          </Button>
+        </div>
       </div>
       <Divider />
       <div className="ml-4 mb-6">时间戳： {data?.timestamp}</div>
-      {data && (
-        <div className="flex" style={{ alignItems: "flex-start" }} key={data.timestamp}>
-          <div className="ml-4">
-            <Image
-              width={400}
-              src={data.rgb_image}
-              preview={{ maskClassName: "11", mask: <></> }}
-            />
+      <div className="flex items-start w-full select-none">
+        {!!isPreview && (
+          <div className="flex items-start relative ml-4 mr-4">
+            <div className="absolute top-0 left-0 text-red-600 z-10 p-2">实时画面</div>
+            <img src={`${address}:3000/video_stream`} width={500} alt="预览" />
           </div>
-          {(data as any).json_data && <PointCloudViewer data={(data as any).json_data} />}
-        </div>
-      )}
+        )}
+        {data && (
+          <div className="flex items-start select-none" key={data.timestamp}>
+            <div className="ml-4 mr-4 relative">
+              <div className="absolute top-0 left-0 text-red-600 z-10 p-2">RGB结果</div>
+              <Image
+                width={500}
+                src={data.rgb_image}
+                preview={{ maskClassName: "11", mask: <></> }}
+              />
+            </div>
+            {(data as any).json_data && <PointCloudViewer data={(data as any).json_data} />}
+          </div>
+        )}
+      </div>
     </>
   );
 }

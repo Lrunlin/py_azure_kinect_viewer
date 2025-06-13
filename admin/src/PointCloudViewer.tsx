@@ -78,7 +78,7 @@ const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ data }) => {
   };
 
   return (
-    <div style={{ height: "600px", width: "600px" }}>
+    <div style={{ height: "500px", width: "500px" }}>
       <ReactECharts option={option} style={{ height: "100%", width: "100%" }} />
     </div>
   );

@@ -1,10 +1,9 @@
 import os
 import time
 import threading
-import numpy as np
 import cv2
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -55,6 +54,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+
+def generate_video_stream():
+    while True:
+        with frame_lock:
+            frame = latest_frame
+        if frame is None:
+            continue
+
+        # 获取当前帧的RGB图像
+        rgb_image = cv2.cvtColor(frame.color, cv2.COLOR_BGRA2BGR)
+
+        # 将图片编码为JPEG格式
+        _, encoded_image = cv2.imencode(".jpg", rgb_image)
+        frame_bytes = encoded_image.tobytes()
+
+        # 返回一个帧，保持持续流
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+
+
+@app.get("/video_stream")
+def video_stream():
+    return StreamingResponse(generate_video_stream(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.get("/capture")
