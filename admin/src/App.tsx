@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Button, Divider, Input, Image, Checkbox, Alert } from "antd";
 import useFetch from "./hooks/useFetch.jsx";
@@ -20,11 +20,17 @@ export interface CountRootObject {
   folder_count: number;
 }
 
+export interface ResourceRootObject {
+  cpu_percent: number;
+  memory_mb: number;
+}
+
 function App() {
   const [address, setAddress] = useState(localStorage.address || "http://127.0.0.1"); //接收缓存地址
   const [preview, setPreview] = useState(+(localStorage.preview == "1")); //接收缓存预览模式
   const [isPreview, setIsPreview] = useState(+(localStorage.is_preview == "1")); //接收缓存预览模式
-  
+  const streamID = useRef(Date.now().toString());
+
   // 请求
   let { data, isLoading, error, refetch } = useFetch<RootObject, {}>(
     () =>
@@ -52,6 +58,7 @@ function App() {
     setData,
   } = useFetch<CountRootObject, {}>(() => axios.get(`${address}:3000/stats`).then(res => res.data));
 
+  // 绑定空格键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" || e.key === " ") {
@@ -64,13 +71,37 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // 资源占用 5秒更新
+  let { data: resource, refetch: resourceRefetch } = useFetch<ResourceRootObject, {}>(
+    () => axios.get(`${address}:3000/resource`).then(res => res.data),
+    {
+      callback: () => {
+        setTimeout(() => {
+          resourceRefetch();
+        }, 5000);
+      },
+    }
+  );
+
   return (
     <>
       <Alert
         className="!mx-4 !mt-4"
         message={
           <div className="flex">
-            今日采集个数: <div className="font-bold mx-1">{count?.folder_count || 0}</div> 个
+            <div className="flex">
+              今日采集个数: <div className="font-bold mx-1">{count?.folder_count || 0}</div> 个
+            </div>
+            {resource && (
+              <div className="ml-8 flex">
+                <div className="flex">
+                  CPU:<span className="font-bold">{resource?.cpu_percent}%</span>
+                </div>
+                <div className="ml-4 flex">
+                  内存:<span className="font-bold">{resource?.memory_mb}MB</span>
+                </div>
+              </div>
+            )}
           </div>
         }
         type="info"
@@ -105,7 +136,13 @@ function App() {
           <Checkbox
             checked={!!isPreview}
             onChange={e => {
+              if (isPreview) {
+                axios.get(`${address}:3000/close_stream`, {
+                  params: { stream_id: streamID.current },
+                });
+              }
               let result = +e.target.checked;
+              streamID.current = Date.now().toString();
               setIsPreview(result);
               localStorage.is_preview = result.toString();
             }}
@@ -125,7 +162,11 @@ function App() {
         {!!isPreview && (
           <div className="flex items-start relative ml-4 mr-4">
             <div className="absolute top-0 left-0 text-red-600 z-10 p-2">实时画面</div>
-            <img src={`${address}:3000/video_stream`} width={500} alt="预览" />
+            <img
+              src={`${address}:3000/video_stream?stream_id=${streamID.current}`}
+              width={500}
+              alt="预览"
+            />
           </div>
         )}
         {data && (

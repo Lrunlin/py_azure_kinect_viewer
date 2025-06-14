@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import datetime
+import psutil
 
 from modules.K4A import K4A
 from modules.save.ply import save_point_cloud_ply
@@ -17,16 +18,18 @@ from modules.save.npy import save_depth_images
 from modules.save.json import save_point_cloud_json
 from modules.generate_point_cloud import generate_point_cloud
 from modules.log import log as debug_log
-from config import OUTPUT_DIR, LOCAL_IP,STATIC_PORT
+from config import OUTPUT_DIR, LOCAL_IP, STATIC_PORT
 
 
 k4a = K4A()
 k4a.start()
 debug_log("Azure Kinect已启动")
 
+# 全局流断开控制(判断实时相机是否断开)
+stream_stop_flags = {}  # {stream_id: bool}
 
-latest_frame = None
-frame_lock = threading.Lock()
+latest_frame = None  # 相机最后一帧
+frame_lock = threading.Lock()  # 锁 实时捕获相机帧
 
 
 def background_capture():
@@ -57,28 +60,33 @@ app.add_middleware(
 )
 
 
-def generate_video_stream():
-    while True:
-        with frame_lock:
-            frame = latest_frame
-        if frame is None:
-            continue
-
-        # 获取当前帧的RGB图像
-        rgb_image = cv2.cvtColor(frame.color, cv2.COLOR_BGRA2BGR)
-
-        # 将图片编码为JPEG格式
-        _, encoded_image = cv2.imencode(".jpg", rgb_image)
-        frame_bytes = encoded_image.tobytes()
-
-        # 返回一个帧，保持持续流
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+# 只能是根据变量判断是否断开 前端注销组件没用
+def generate_video_stream(stream_id: str):
+    global stream_stop_flags
+    try:
+        while True:
+            # 检查自己是否需要断开
+            if stream_stop_flags.get(stream_id, False):
+                break
+            with frame_lock:
+                frame = latest_frame
+            if frame is None:
+                time.sleep(0.01)
+                continue
+            rgb_image = cv2.cvtColor(frame.color, cv2.COLOR_BGRA2BGR)
+            _, encoded_image = cv2.imencode(".jpg", rgb_image)
+            frame_bytes = encoded_image.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+    finally:
+        # 流断开后删除标记
+        stream_stop_flags.pop(stream_id, None)
 
 
 @app.get("/video_stream")
-def video_stream():
-    return StreamingResponse(generate_video_stream(), media_type="multipart/x-mixed-replace; boundary=frame")
+def video_stream(stream_id: str = Query(...)):
+    stream_stop_flags[stream_id] = False  # 新连接
+    return StreamingResponse(generate_video_stream(stream_id), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.get("/capture")
@@ -171,6 +179,31 @@ def get_today_stats():
         "date": today_str,
         "folder_count": folder_count
     })
+
+
+@app.get("/close_stream")
+def close_stream(stream_id: str = Query(...)):
+    stream_stop_flags[stream_id] = True
+    return JSONResponse({"status": "ok", "message": f"流 {stream_id} 已请求断开"})
+
+
+@app.get("/resource")
+def get_resource():
+    pid = os.getpid()
+    p = psutil.Process(pid)
+    mem_info = p.memory_info()
+    mem_usage_mb = mem_info.rss / 1024 / 1024
+
+    cpu_percent = p.cpu_percent(interval=0.5)  # 获取总占比
+    cpu_count = psutil.cpu_count(logical=True)  # 逻辑核心数
+
+    # 平均到所有核心，最大不会超过 100%
+    cpu_percent_normalized = cpu_percent / cpu_count
+
+    return {
+        "cpu_percent": round(cpu_percent_normalized, 2),
+        "memory_mb": round(mem_usage_mb, 2),
+    }
 
 
 if __name__ == "__main__":
