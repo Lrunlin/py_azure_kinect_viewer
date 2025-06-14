@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "p": "vite preview",
-    "bp": "vite build&&vite preview"
+    "bp": "vite build && nodemon ./public/start.cjs --ignore *",
+    "start": "nodemon ./public/start.cjs --ignore *"
   },
   "dependencies": {
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
@@ -18,6 +19,8 @@
     "echarts": "^5.6.0",
     "echarts-for-react": "^3.0.2",
     "echarts-gl": "^2.0.9",
+    "express": "^5.1.0",
+    "nodemon": "^3.1.10",
     "postcss": "^8.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

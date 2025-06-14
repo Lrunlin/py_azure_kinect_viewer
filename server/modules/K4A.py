@@ -33,8 +33,8 @@ DepthMode.PASSIVE_IR        # 仅红外模式
 def K4A():
     return PyK4A(Config(
         color_resolution=(
-            RES == '4K' if ColorResolution.RES_3072P else ColorResolution.RES_1080P),
-        camera_fps=RES == '4K' if FPS.FPS_15 else FPS.FPS_30,
+            ColorResolution.RES_3072P if RES == '4K' else ColorResolution.RES_1080P),
+        camera_fps= FPS.FPS_15 if RES == '4K' else FPS.FPS_30,
         depth_mode=DepthMode.NFOV_UNBINNED,
         synchronized_images_only=True
     ))

@@ -24,7 +24,7 @@ function App() {
   const [address, setAddress] = useState(localStorage.address || "http://127.0.0.1"); //接收缓存地址
   const [preview, setPreview] = useState(+(localStorage.preview == "1")); //接收缓存预览模式
   const [isPreview, setIsPreview] = useState(+(localStorage.is_preview == "1")); //接收缓存预览模式
-
+  
   // 请求
   let { data, isLoading, error, refetch } = useFetch<RootObject, {}>(
     () =>
@@ -44,6 +44,7 @@ function App() {
       },
     }
   );
+
   // 今日个数
   let {
     data: count,

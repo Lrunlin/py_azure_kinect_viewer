@@ -1,3 +1,4 @@
+from fastapi.responses import StreamingResponse
 import os
 import time
 import threading
@@ -16,7 +17,7 @@ from modules.save.npy import save_depth_images
 from modules.save.json import save_point_cloud_json
 from modules.generate_point_cloud import generate_point_cloud
 from modules.log import log as debug_log
-from config import OUTPUT_DIR, LOCAL_IP
+from config import OUTPUT_DIR, LOCAL_IP,STATIC_PORT
 
 
 k4a = K4A()
@@ -100,7 +101,7 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
     cv2.imwrite(rgb_path, color_image)
     debug_log(f"保存RGB完成，用时 {time.time() - t_start:.3f} 秒")
 
-    host_url = f"http://{LOCAL_IP}:3000"
+    host_url = f"http://{LOCAL_IP}:{STATIC_PORT}"
 
     def to_url_path(path):
         rel_path = path.replace(OUTPUT_DIR, "/data")
