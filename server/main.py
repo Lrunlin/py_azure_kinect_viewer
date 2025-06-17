@@ -1,3 +1,6 @@
+import asyncio
+import numpy as np
+from fastapi import FastAPI, WebSocket
 from fastapi.responses import StreamingResponse
 import os
 import time
@@ -12,10 +15,10 @@ import datetime
 import psutil
 
 from modules.K4A import K4A
-from modules.save.ply import save_point_cloud_ply
-from modules.save.pcd import save_point_cloud_pcd
-from modules.save.npy import save_depth_images
-from modules.save.json import save_point_cloud_json
+from modules.save.to_ply import save_point_cloud_ply
+from modules.save.to_pcd import save_point_cloud_pcd
+from modules.save.to_npy import save_depth_images
+from modules.save.to_json import save_point_cloud_json
 from modules.generate_point_cloud import generate_point_cloud
 from modules.log import log as debug_log
 from config import OUTPUT_DIR, LOCAL_IP, STATIC_PORT
@@ -204,6 +207,29 @@ def get_resource():
         "cpu_percent": round(cpu_percent_normalized, 2),
         "memory_mb": round(mem_usage_mb, 2),
     }
+
+
+@app.websocket("/ws/pointcloud")
+async def websocket_pointcloud(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            await asyncio.sleep(0.05)
+            with frame_lock:
+                frame = latest_frame
+            if frame is None or frame.color is None or frame.depth is None:
+                continue
+            fx, fy = 600.0, 600.0
+            cx, cy = frame.depth.shape[1] / 2.0, frame.depth.shape[0] / 2.0
+            points, _ = generate_point_cloud(  # 只要 points
+                frame.depth, fx, fy, cx, cy, frame.color)
+            pc = points.astype(np.float32)  # (N,3)
+            await websocket.send_bytes(pc.tobytes())
+    except Exception as e:
+        # 断开链接
+        pass
+    finally:
+        await websocket.close()
 
 
 if __name__ == "__main__":

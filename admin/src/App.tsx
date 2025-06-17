@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { Button, Divider, Input, Image, Checkbox, Alert } from "antd";
+import { Button, Divider, Input, Image, Checkbox, Alert, Modal } from "antd";
 import useFetch from "./hooks/useFetch.jsx";
-import PointCloudViewer from "./PointCloudViewer.tsx";
+import PointCloudViewer from "./components/PointCloudViewer/index.tsx";
 
 export interface RootObject {
   status: string;
@@ -154,6 +154,7 @@ function App() {
           <Button className="mt-4" loading={isLoading} type="primary" onClick={() => refetch()}>
             点云保存
           </Button>
+          <PointCloudViewer bottonProps={{className:"ml-4"}} />
         </div>
       </div>
       <Divider />
@@ -179,7 +180,6 @@ function App() {
                 preview={{ maskClassName: "11", mask: <></> }}
               />
             </div>
-            {(data as any).json_data && <PointCloudViewer data={(data as any).json_data} />}
           </div>
         )}
       </div>
