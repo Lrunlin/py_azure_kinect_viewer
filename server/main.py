@@ -93,7 +93,7 @@ def video_stream(stream_id: str = Query(...)):
 
 
 @app.get("/capture")
-def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0=极速模式")):
+def capture():
     with frame_lock:
         frame = latest_frame
     if frame is None:
@@ -119,47 +119,27 @@ def capture(preview_mode: int = Query(1, description="预览模式: 1=正常，0
         rel_path = rel_path.replace("\\", "/")
         return f"{host_url}{rel_path}"
 
-    if preview_mode == 0:
-        def background_save():
-            try:
-                depth_image = frame.depth
-                save_depth_images(base_dir, timestamp,
-                                  depth_image, color_image)
-                fx, fy = 600.0, 600.0
-                cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
-                points, colors = generate_point_cloud(
-                    depth_image, fx, fy, cx, cy, color_image)
-                save_point_cloud_ply(os.path.join(
-                    base_dir, f"{timestamp}.ply"), points, colors)
-                save_point_cloud_pcd(os.path.join(
-                    base_dir, f"{timestamp}.pcd"), points, colors)
-                debug_log("极速模式：后台保存完毕")
-            except Exception as e:
-                debug_log(f"极速模式后台保存失败: {e}")
-        threading.Thread(target=background_save, daemon=True).start()  # 多线程保存
-        return JSONResponse(content={
-            "status": "success",
-            "timestamp": timestamp,
-            "rgb_image": to_url_path(rgb_path)
-        })
-
-    depth_image = frame.depth
-    save_depth_images(base_dir, timestamp, depth_image, color_image)
-    fx, fy = 600.0, 600.0
-    cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
-    points, colors = generate_point_cloud(
-        depth_image, fx, fy, cx, cy, color_image)
-    save_point_cloud_ply(os.path.join(
-        base_dir, f"{timestamp}.ply"), points, colors)
-    save_point_cloud_pcd(os.path.join(
-        base_dir, f"{timestamp}.pcd"), points, colors)
-
-    debug_log("预览模式：所有数据保存完成")
+    def background_save():
+        try:
+            depth_image = frame.depth
+            save_depth_images(base_dir, timestamp,
+                              depth_image, color_image)
+            fx, fy = 600.0, 600.0
+            cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
+            points, colors = generate_point_cloud(
+                depth_image, fx, fy, cx, cy, color_image)
+            save_point_cloud_ply(os.path.join(
+                base_dir, f"{timestamp}.ply"), points, colors)
+            save_point_cloud_pcd(os.path.join(
+                base_dir, f"{timestamp}.pcd"), points, colors)
+            debug_log("极速模式：后台保存完毕")
+        except Exception as e:
+            debug_log(f"极速模式后台保存失败: {e}")
+    threading.Thread(target=background_save, daemon=True).start()  # 多线程保存
     return JSONResponse(content={
         "status": "success",
         "timestamp": timestamp,
-        "rgb_image": to_url_path(rgb_path),
-        "json_data": save_point_cloud_json(points, colors)
+        "rgb_image": to_url_path(rgb_path)
     })
 
 

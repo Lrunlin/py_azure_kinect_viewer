@@ -1,14 +1,27 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 你的 .npy 路径
-file_path = 'E:/DeskTop/Py_Demo/data/2025-06-16/1750069442751/1750069442751_depth.npy'
+# ========== 参数解析部分 ==========
+parser = argparse.ArgumentParser(description='npy文件读取与展示')
+parser.add_argument('--path', type=str, help='npy文件路径')
+args = parser.parse_args()
 
-# 读取
+# ========== 路径选择逻辑 ==========
+if args.path:
+    file_path = args.path
+    print(f"使用命令行参数路径: {file_path}")
+else:
+    # 方式1：手动输入
+    # file_path = input("请输入npy文件路径：")
+    # 方式2：用默认变量（如你最初写的）
+    file_path = 'E:/DeskTop/Py_Demo/data/2025-06-16/1750069442751/1750069442751_depth.npy'
+    print(f"使用默认路径: {file_path}")
+
+# ========== 读取与展示部分 ==========
 arr = np.load(file_path, allow_pickle=True)
-data = arr.item()  # 取出字典
+data = arr.item()  # 假设npy里是dict
 
-# 查看有哪些key
 print("keys:", data.keys())
 
 # 提取深度图
@@ -22,7 +35,7 @@ if depth is not None:
 else:
     print("未找到'depth'键")
 
-# 提取彩色图（如果需要）
+# # 提取彩色图（如果需要）
 # color = data.get("color")
 # if color is not None:
 #     print("color shape:", color.shape, "dtype:", color.dtype)

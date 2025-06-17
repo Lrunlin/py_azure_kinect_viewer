@@ -27,16 +27,12 @@ export interface ResourceRootObject {
 
 function App() {
   const [address, setAddress] = useState(localStorage.address || "http://127.0.0.1"); //接收缓存地址
-  const [preview, setPreview] = useState(+(localStorage.preview == "1")); //接收缓存预览模式
   const [isPreview, setIsPreview] = useState(+(localStorage.is_preview == "1")); //接收缓存预览模式
   const streamID = useRef(Date.now().toString());
 
   // 请求
   let { data, isLoading, error, refetch } = useFetch<RootObject, {}>(
-    () =>
-      axios
-        .get(`${address}:3000/capture`, { params: { preview_mode: preview } })
-        .then(res => res.data),
+    () => axios.get(`${address}:3000/capture`).then(res => res.data),
     {
       manual: true,
       callback: () => {
@@ -115,24 +111,11 @@ function App() {
           value={address}
           onChange={e => setAddress(e.target.value)}
         />
-        {/* <Button className="ml-4" type="primary" onClick={() => setAddress(address)}>
-          地址填充
-        </Button> */}
       </div>
       <Divider />
       {/* 点击请求 */}
       <div className="mt-4 ml-4">
         <div>
-          <Checkbox
-            checked={!!preview}
-            onChange={e => {
-              let result = +e.target.checked;
-              setPreview(result);
-              localStorage.preview = result.toString();
-            }}
-          >
-            预览点云
-          </Checkbox>
           <Checkbox
             checked={!!isPreview}
             onChange={e => {
@@ -154,7 +137,7 @@ function App() {
           <Button className="mt-4" loading={isLoading} type="primary" onClick={() => refetch()}>
             点云保存
           </Button>
-          <PointCloudViewer bottonProps={{className:"ml-4"}} />
+          <PointCloudViewer bottonProps={{ className: "ml-4" }} />
         </div>
       </div>
       <Divider />
