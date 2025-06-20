@@ -18,7 +18,6 @@ from modules.K4A import K4A
 from modules.save.to_ply import save_point_cloud_ply
 from modules.save.to_pcd import save_point_cloud_pcd
 from modules.save.to_npy import save_depth_images
-from modules.save.to_json import save_point_cloud_json
 from modules.generate_point_cloud import generate_point_cloud
 from modules.log import log as debug_log
 from config import OUTPUT_DIR, LOCAL_IP, STATIC_PORT
