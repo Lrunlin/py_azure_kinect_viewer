@@ -1,12 +1,10 @@
 import asyncio
 import numpy as np
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import StreamingResponse
 import os
 import time
 import threading
 import cv2
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, WebSocket
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +15,8 @@ import psutil
 from modules.K4A import K4A
 from modules.save.to_ply import save_point_cloud_ply
 from modules.save.to_pcd import save_point_cloud_pcd
-from modules.save.to_npy import save_depth_images
+from modules.save.to_npy import save_point_cloud_npy
+from modules.save.to_png import save_rgb_images
 from modules.generate_point_cloud import generate_point_cloud
 from modules.log import log as debug_log
 from config import OUTPUT_DIR, LOCAL_IP, STATIC_PORT
@@ -108,7 +107,7 @@ def capture():
     t_start = time.time()
     color_image = cv2.cvtColor(frame.color, cv2.COLOR_BGRA2BGR)
     rgb_path = os.path.join(base_dir, f"{timestamp}.png")
-    cv2.imwrite(rgb_path, color_image)
+    save_rgb_images(rgb_path, color_image)
     debug_log(f"保存RGB完成，用时 {time.time() - t_start:.3f} 秒")
 
     host_url = f"http://{LOCAL_IP}:{STATIC_PORT}"
@@ -121,7 +120,7 @@ def capture():
     def background_save():
         try:
             depth_image = frame.depth
-            save_depth_images(base_dir, timestamp,
+            save_point_cloud_npy(base_dir, timestamp,
                               depth_image, color_image)
             fx, fy = 600.0, 600.0
             cx, cy = depth_image.shape[1] / 2.0, depth_image.shape[0] / 2.0
@@ -131,9 +130,9 @@ def capture():
                 base_dir, f"{timestamp}.ply"), points, colors)
             save_point_cloud_pcd(os.path.join(
                 base_dir, f"{timestamp}.pcd"), points, colors)
-            debug_log("极速模式：后台保存完毕")
+            debug_log("后台保存完毕")
         except Exception as e:
-            debug_log(f"极速模式后台保存失败: {e}")
+            debug_log(f"后台保存失败: {e}")
     threading.Thread(target=background_save, daemon=True).start()  # 多线程保存
     return JSONResponse(content={
         "status": "success",
@@ -166,7 +165,7 @@ def get_today_stats():
 @app.get("/close_stream")
 def close_stream(stream_id: str = Query(...)):
     stream_stop_flags[stream_id] = True
-    return JSONResponse({"status": "ok", "message": f"流 {stream_id} 已请求断开"})
+    return JSONResponse({"status": "ok"})
 
 
 @app.get("/resource")
