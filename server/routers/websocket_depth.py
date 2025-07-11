@@ -7,7 +7,7 @@ from modules.generate_point_cloud import generate_point_cloud
 router = APIRouter()
 
 
-@router.websocket("/ws/pointcloud")
+@router.websocket("/ws/depth")
 async def websocket_pointcloud(websocket: WebSocket):
     await websocket.accept()
     try:

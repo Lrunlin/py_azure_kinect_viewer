@@ -4,7 +4,7 @@ import { Button, Modal } from "antd";
 import type { ButtonProps } from "antd";
 import Viewer from "./Viewer.tsx";
 
-const PointCloudViewer: FC<{ bottonProps: ButtonProps & { className?: string } }> = props => {
+const DepthViewer: FC<{ bottonProps: ButtonProps & { className?: string } }> = props => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOk = () => {
@@ -35,4 +35,4 @@ const PointCloudViewer: FC<{ bottonProps: ButtonProps & { className?: string } }
     </>
   );
 };
-export default PointCloudViewer;
+export default DepthViewer;

@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('TkAgg')
 
-
 # ========== 参数解析部分 ==========
 parser = argparse.ArgumentParser(description='npy文件读取与展示')
 parser.add_argument('--path', type=str, help='npy文件路径')
@@ -16,30 +15,38 @@ if args.path:
     print(f"使用命令行参数路径: {file_path}")
 else:
     file_path = input("请输入npy文件路径：")
-    # file_path = 'E:\\DeskTop\\Py_Demo\data\\2025-06-17\\1750148745730\\1750148745730_depth.npy'
-    print(f"使用默认路径: {file_path}")
+    print(f"使用输入路径: {file_path}")
 
 # ========== 读取与展示部分 ==========
 arr = np.load(file_path, allow_pickle=True)
-data = arr.item()  # 假设npy里是dict
 
-print("keys:", data.keys())
-
-# 提取深度图
-depth = data.get("depth")
-if depth is not None:
-    print("depth shape:", depth.shape, "dtype:", depth.dtype)
+# 处理多种格式
+if isinstance(arr, dict):
+    data = arr
+elif isinstance(arr, np.ndarray) and arr.dtype == 'O' and arr.size == 1:
+    # 典型的np.save(dict)方式
+    data = arr.item()
+elif isinstance(arr, np.ndarray) and arr.ndim >= 2:
+    # 纯数组格式
+    data = None
+    depth = arr
+    print("本npy文件为数组格式，shape:", depth.shape, "dtype:", depth.dtype)
     plt.imshow(depth, cmap='gray')
-    plt.title("Depth")
+    plt.title("Depth (array直接存储)")
     plt.colorbar()
     plt.show()
 else:
-    print("未找到'depth'键")
+    print("无法识别的数据结构！")
+    data = None
 
-# # 提取彩色图（如果需要）
-# color = data.get("color")
-# if color is not None:
-#     print("color shape:", color.shape, "dtype:", color.dtype)
-#     plt.imshow(color)
-#     plt.title("Color")
-#     plt.show()
+if data is not None:
+    print("keys:", data.keys())
+    depth = data.get("depth")
+    if depth is not None:
+        print("depth shape:", depth.shape, "dtype:", depth.dtype)
+        plt.imshow(depth, cmap='gray')
+        plt.title("Depth")
+        plt.colorbar()
+        plt.show()
+    else:
+        print("未找到'depth'键")

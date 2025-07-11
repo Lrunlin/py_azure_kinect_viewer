@@ -1,12 +1,12 @@
 import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
 
-const WS_URL = "ws://localhost:3000/ws/pointcloud";
+const WS_URL = "ws://localhost:3000/ws/depth";
 
 const Viewer: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
-  
+
   useEffect(() => {
     let width = mountRef.current?.clientWidth || 0;
     let height = mountRef.current?.clientHeight || 0;
@@ -79,9 +79,31 @@ const Viewer: React.FC = () => {
 
   return (
     <div
-      ref={mountRef}
-      style={{ width: "70vw", height: "70vh", background: "#181818", zIndex: 999999 }}
-    />
+      style={{
+        width: "50vw", // 外部可视窗口宽高
+        height: "100vh",
+        overflow: "hidden", // 超出部分裁掉
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          transform: "scale(3.5)", // 放大2.5倍
+          transformOrigin: "50% 50%", // 以中点为缩放中心
+        }}
+      >
+        <div
+          ref={mountRef}
+          style={{
+            width: "100%",
+            height: "100%",
+            background: "#181818",
+          }}
+        />
+      </div>
+    </div>
   );
 };
 

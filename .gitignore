@@ -8,3 +8,5 @@ __pycache__
 data/**/*.*
 
 admin/dist
+server/public
+video/**/*.mp4
